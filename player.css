@@ -1,0 +1,427 @@
+.nitro-notification-bubble.tabblet-radio-bubble {
+  background-color: var(--tabblet-radio-background, rgba(105, 45, 170, 0.82)) !important;
+  border: 1px solid rgba(190, 130, 255, 0.55) !important;
+  box-sizing: border-box;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  overflow: hidden;
+}
+
+.nitro-notification-bubble.tabblet-radio-player-bubble {
+  margin: 0 !important;
+  max-width: calc(100vw - 16px) !important;
+  position: relative !important;
+  inset: auto !important;
+  z-index: auto;
+}
+
+.tabblet-radio,
+.tabblet-radio * {
+  box-sizing: border-box;
+  min-inline-size: 0;
+}
+
+.tabblet-radio {
+  position: relative;
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  inline-size: 100%;
+  line-height: 1.4;
+  max-inline-size: 100%;
+  overflow: hidden;
+}
+
+.tabblet-radio-header {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 8px;
+  justify-content: space-between;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  padding: 3px 2px 8px;
+  text-align: start;
+}
+
+.tabblet-radio-header .tabblet-radio-listeners {
+  color: rgba(255, 255, 255, 0.78);
+  flex: 0 1 auto;
+  font-size: 10px;
+  font-weight: 400;
+  margin-inline-start: auto;
+  text-align: end;
+}
+
+.tabblet-radio-heading {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabblet-radio-chevron {
+  fill: currentColor;
+  flex: 0 0 12px;
+  height: 12px;
+  transition: transform 150ms ease;
+  width: 12px;
+}
+
+.tabblet-radio-header[aria-expanded="false"] .tabblet-radio-chevron {
+  transform: rotate(180deg);
+}
+
+.tabblet-radio-content[hidden] {
+  display: none;
+}
+
+.tabblet-radio-main {
+  align-items: flex-start;
+  display: flex;
+  gap: 9px;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  min-height: 44px;
+}
+
+.tabblet-radio-avatar {
+  align-items: center;
+  display: flex;
+  flex: 0 0 40px;
+  height: 40px;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  inset-block-start: -2px;
+  inset-inline-start: 3px;
+}
+
+.tabblet-radio-avatar-image {
+  background-color: rgba(255, 255, 255, 0.12);
+  background-position: center 40%;
+  background-repeat: no-repeat;
+  background-size: auto 140px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  height: 40px;
+  inset: 0;
+  position: absolute;
+  width: 40px;
+}
+
+.tabblet-radio-controls {
+  align-items: stretch;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tabblet-radio-control-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  min-height: 28px;
+}
+
+.tabblet-radio-play {
+  align-items: center;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 28px;
+  height: 28px;
+  justify-content: center;
+  padding: 0;
+  transition: background-color 150ms ease, transform 150ms ease;
+  width: 28px;
+}
+
+.tabblet-radio-play:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.tabblet-radio-play:active {
+  transform: scale(0.94);
+}
+
+.tabblet-radio-play:focus-visible,
+.tabblet-radio-header:focus-visible,
+.tabblet-radio-volume:focus-visible {
+  outline: 2px solid #e3c9ff;
+  outline-offset: 2px;
+}
+
+.tabblet-radio-play svg {
+  fill: currentColor;
+  height: 12px;
+  width: 12px;
+}
+
+.tabblet-radio-pause-icon,
+.tabblet-radio-playing .tabblet-radio-play-icon {
+  display: none;
+}
+
+.tabblet-radio-playing .tabblet-radio-pause-icon {
+  display: block;
+}
+
+.tabblet-radio-volume {
+  accent-color: #d5aaff;
+  cursor: pointer;
+  flex: 1 1 0;
+  margin: 0;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  width: auto;
+}
+
+.tabblet-radio-meta {
+  max-inline-size: 100%;
+  overflow: hidden;
+}
+
+.tabblet-radio-presenter,
+.tabblet-radio-program {
+  inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabblet-radio-program[hidden] {
+  display: none;
+}
+
+.tabblet-radio-presenter {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tabblet-radio-program {
+  display: block;
+  inline-size: calc(100% - 24px);
+  max-inline-size: calc(100% - 24px);
+  color: #e3c9ff;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.tabblet-radio-program-track {
+  display: inline-flex;
+  gap: 24px;
+  inline-size: max-content;
+  min-inline-size: max-content;
+  white-space: nowrap;
+  animation: tabblet-radio-program-scroll var(--tabblet-radio-program-duration, 14s) linear infinite;
+}
+
+.tabblet-radio-program-copy {
+  display: inline-block;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.tabblet-radio-program:hover .tabblet-radio-program-track {
+  animation-play-state: paused;
+}
+
+@keyframes tabblet-radio-program-scroll {
+  to {
+    transform: translateX(calc(-50% - 12px));
+  }
+}
+
+.tabblet-radio-status {
+  color: #ead7ff;
+  font-size: 11px;
+  line-height: 1.3;
+  max-inline-size: 100%;
+  min-height: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.tabblet-radio-status:not(:empty) {
+  margin-top: 5px;
+  min-height: 14px;
+}
+
+.tabblet-radio-restart {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  bottom: 1px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  display: inline-flex;
+  height: 18px;
+  justify-content: center;
+  padding: 3px;
+  position: absolute;
+  right: 1px;
+  transition: background-color 150ms ease, color 150ms ease;
+  width: 18px;
+}
+
+.tabblet-radio-restart:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.tabblet-radio-restart:focus-visible {
+  outline: 2px solid #e3c9ff;
+  outline-offset: 2px;
+}
+
+.tabblet-radio-restart:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.tabblet-radio-restart svg {
+  fill: currentColor;
+  height: 10px;
+  width: 10px;
+}
+
+.tabblet-radio-bubble.tabblet-radio-restarting .tabblet-radio-restart svg {
+  animation: tabblet-radio-restart-spin 700ms linear infinite;
+}
+
+@keyframes tabblet-radio-restart-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tabblet-radio-follow-group {
+  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  position: fixed;
+  z-index: 2147483647;
+}
+
+.tabblet-radio-live-indicator {
+  align-items: center;
+  background: rgba(115, 18, 30, 0.96);
+  border: 1px solid rgba(255, 120, 130, 0.72);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  color: #fff;
+  display: flex;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 6px;
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 25px;
+  padding: 5px 9px;
+}
+
+.tabblet-radio-live-dot {
+  animation: tabblet-radio-live-pulse 1.2s ease-in-out infinite;
+  background: #ff394d;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(255, 57, 77, 0.7);
+  flex: 0 0 7px;
+  height: 7px;
+  width: 7px;
+}
+
+@keyframes tabblet-radio-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 57, 77, 0.7);
+    opacity: 1;
+  }
+
+  70% {
+    box-shadow: 0 0 0 5px rgba(255, 57, 77, 0);
+    opacity: 0.75;
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 57, 77, 0);
+    opacity: 1;
+  }
+}
+
+.tabblet-radio-follow {
+  align-items: center;
+  background: #26a65b;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  justify-content: center;
+  min-height: 30px;
+  padding: 6px 10px;
+  width: 100%;
+}
+
+.tabblet-radio-follow:hover {
+  background: #1d8b4b;
+}
+
+.tabblet-radio-follow:focus-visible {
+  outline: 2px solid #b6f5cb;
+  outline-offset: 2px;
+}
+
+.tabblet-radio-follow-group[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabblet-radio-live-dot {
+    animation: none;
+  }
+}
+
+@media (max-width: 220px) {
+  .tabblet-radio-main {
+    gap: 6px;
+  }
+
+  .tabblet-radio-avatar,
+  .tabblet-radio-avatar-image {
+    flex-basis: 34px;
+    height: 34px;
+    width: 34px;
+  }
+
+  .tabblet-radio-avatar-image {
+    flex-basis: auto;
+  }
+}

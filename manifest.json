@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Rádio Tabblet",
+  "version": "1.0.0",
+  "description": "Substitui o player da RádioHabblet pela Rádio Tabblet no Habblet.",
+  "icons": {
+    "16": "tabblet.png",
+    "32": "tabblet.png",
+    "48": "tabblet.png",
+    "128": "tabblet.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "tabblet.png",
+      "32": "tabblet.png",
+      "48": "tabblet.png",
+      "128": "tabblet.png"
+    },
+    "default_title": "Rádio Tabblet"
+  },
+  "permissions": ["offscreen", "storage", "tabs"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; media-src https://streaming.pluz.fm;"
+  },
+  "host_permissions": [
+    "https://www.habblet.city/*",
+    "https://habblet.city/*",
+    "https://tabblet.net/*",
+    "https://api.radiohabblet.com.br/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.habblet.city/hotel*",
+        "https://habblet.city/hotel*"
+      ],
+      "js": ["content.js"],
+      "css": ["player.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
