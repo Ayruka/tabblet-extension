@@ -18,6 +18,81 @@
   z-index: auto;
 }
 
+.nitro-notification-bubble.tabblet-live-announcement {
+  align-items: center;
+  background-color: rgba(105, 45, 170, 0.96) !important;
+  border: 1px solid rgba(190, 130, 255, 0.75);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  color: #fff;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 9px;
+  line-height: 1.4;
+  margin: 8px 0 0 !important;
+  max-width: min(380px, 100%);
+  min-width: 0;
+  padding: 9px 11px;
+  position: relative !important;
+  inset: auto !important;
+}
+
+.tabblet-live-announcement-avatar {
+  background-color: rgba(255, 255, 255, 0.12);
+  background-position: center 40%;
+  background-repeat: no-repeat;
+  background-size: auto 88px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  flex: 0 0 38px;
+  height: 38px;
+  width: 38px;
+}
+
+.tabblet-live-announcement-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tabblet-live-announcement-message,
+.tabblet-live-announcement-program {
+  color: #fff;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tabblet-live-announcement-program {
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 11px;
+}
+
+.tabblet-live-announcement-follow {
+  align-self: flex-start;
+  background: transparent;
+  border: 0;
+  color: #ead8ff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 0 0;
+  text-decoration: underline;
+}
+
+.tabblet-live-announcement-follow:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.tabblet-live-announcement-follow:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 .tabblet-radio,
 .tabblet-radio * {
   box-sizing: border-box;

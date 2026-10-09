@@ -1,13 +1,73 @@
 (() => {
   const PLAYER_MARKER = "data-tabblet-radio-player";
   const ORIGINAL_PLAYER_MARKER = "data-tabblet-radio-original-player";
+  const LIVE_NOTIFICATION_DURATION_MS = 10_000;
   const RADIO_LABEL = /rádio\s*habblet|radio\s*habblet/i;
   let presenterRefreshTimer;
+  let previousPresenterLive = null;
   const presenterRequests = new WeakMap();
   const followButtons = new Map();
   const programTickerObservers = new WeakMap();
   const radioPlayers = new Map();
   const collapseAttempts = new WeakSet();
+
+  function showLiveBroadcastNotification(broadcast) {
+    const notification = document.createElement("div");
+    notification.className = "nitro-notification-bubble default-bubble rounded p-2 tabblet-live-announcement";
+    notification.dataset.tabbletLiveAnnouncement = "";
+    notification.setAttribute("aria-live", "polite");
+
+    const avatar = document.createElement("div");
+    avatar.className = "tabblet-live-announcement-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    if (broadcast.avatarDataUrl) {
+      avatar.style.backgroundImage = `url("${broadcast.avatarDataUrl}")`;
+    }
+
+    const content = document.createElement("div");
+    content.className = "tabblet-live-announcement-content";
+    const message = document.createElement("div");
+    message.className = "tabblet-live-announcement-message";
+    const username = document.createElement("strong");
+    username.textContent = broadcast.username;
+    const programTitle = document.createElement("strong");
+    programTitle.textContent = broadcast.programTitle || "As melhores da Tabblet";
+    message.append(username, document.createTextNode(" está ao vivo!"));
+    const program = document.createElement("div");
+    program.className = "tabblet-live-announcement-program";
+    program.append(document.createTextNode("Programação: "), programTitle);
+
+    const followButton = document.createElement("button");
+    followButton.className = "tabblet-live-announcement-follow";
+    followButton.type = "button";
+    followButton.textContent = "Clique aqui para seguir";
+    followButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void sendFollowCommand(broadcast.username, followButton);
+    });
+    content.append(message, program, followButton);
+    notification.append(avatar, content);
+
+    const existingBubbles = Array.from(document.querySelectorAll(
+      ".nitro-notification-bubble:not([data-tabblet-radio-player]):not([data-tabblet-live-announcement])"
+    )).filter((bubble) => bubble.parentElement);
+    const anchor = existingBubbles[existingBubbles.length - 1];
+    if (anchor) {
+      const stack = anchor.parentElement;
+      const stackBubbles = existingBubbles.filter((bubble) => bubble.parentElement === stack);
+      if (getComputedStyle(stack).flexDirection === "column-reverse") {
+        const firstBubble = stackBubbles[0];
+        stack.insertBefore(notification, firstBubble || stack.firstChild);
+      } else {
+        const lastBubble = stackBubbles[stackBubbles.length - 1];
+        (lastBubble || anchor).after(notification);
+      }
+    } else {
+      console.warn("Rádio Tabblet: não foi encontrado o contêiner de notificações; o alerta será adicionado à página.");
+      document.body.append(notification);
+    }
+    window.setTimeout(() => notification.remove(), LIVE_NOTIFICATION_DURATION_MS);
+  }
 
   function muteOriginalPlayer(bubble) {
     bubble.querySelectorAll("audio, video").forEach((media) => {
@@ -96,7 +156,8 @@
   function waitForChatInput(button) {
     const findInput = () => document.querySelector('input.chat-input[name="chat"]');
     const input = findInput();
-    if (input || !button.isConnected || button.closest(".tabblet-radio-follow-group").hidden) {
+    const followGroup = button.closest(".tabblet-radio-follow-group");
+    if (input || !button.isConnected || (followGroup && followGroup.hidden)) {
       return Promise.resolve(input);
     }
 
@@ -104,7 +165,7 @@
       const observer = new MutationObserver(() => {
         const chatInput = findInput();
         const container = button.closest(".tabblet-radio-follow-group");
-        if (chatInput || !button.isConnected || !container || container.hidden) {
+        if (chatInput || !button.isConnected || (container && container.hidden)) {
           observer.disconnect();
           resolve(chatInput);
         }
@@ -118,45 +179,27 @@
     });
   }
 
-  function createFollowButton(bubble) {
-    const container = document.createElement("div");
-    container.className = "tabblet-radio-follow-group";
-    container.hidden = true;
-    const indicator = document.createElement("div");
-    indicator.className = "tabblet-radio-live-indicator";
-    indicator.innerHTML = '<span class="tabblet-radio-live-dot" aria-hidden="true"></span><span>Ao vivo</span>';
-    const button = document.createElement("button");
-    button.className = "tabblet-radio-follow";
-    button.type = "button";
-    button.textContent = "Seguir";
-    button.title = "Seguir o locutor ao vivo no Habblet";
-    const onFollowClick = async () => {
-      const username = button.dataset.username;
-      if (!username) {
-        return;
-      }
-      button.disabled = true;
+  async function sendFollowCommand(username, button) {
+    if (!username) {
+      return;
+    }
+    button.disabled = true;
+    try {
       const chatInput = await waitForChatInput(button);
       if (!chatInput) {
-        if (button.isConnected) {
-          button.disabled = false;
-        }
         return;
       }
       if (chatInput.disabled || chatInput.readOnly) {
         console.error("Rádio Tabblet: o campo de chat está indisponível.");
-        button.disabled = false;
         return;
       }
       if (chatInput.value.trim()) {
         console.warn("Rádio Tabblet: limpe a mensagem atual do chat antes de usar Seguir.");
-        button.disabled = false;
         return;
       }
       const command = `:follow ${username}`;
       if (command.length > chatInput.maxLength) {
         console.error("Rádio Tabblet: o nome do locutor excede o limite de caracteres do chat.");
-        button.disabled = false;
         return;
       }
 
@@ -183,7 +226,27 @@
         bubbles: true,
         cancelable: true
       }));
-      button.disabled = false;
+    } finally {
+      if (button.isConnected) {
+        button.disabled = false;
+      }
+    }
+  }
+
+  function createFollowButton(bubble) {
+    const container = document.createElement("div");
+    container.className = "tabblet-radio-follow-group";
+    container.hidden = true;
+    const indicator = document.createElement("div");
+    indicator.className = "tabblet-radio-live-indicator";
+    indicator.innerHTML = '<span class="tabblet-radio-live-dot" aria-hidden="true"></span><span>Ao vivo</span>';
+    const button = document.createElement("button");
+    button.className = "tabblet-radio-follow";
+    button.type = "button";
+    button.textContent = "Seguir";
+    button.title = "Seguir o locutor ao vivo no Habblet";
+    const onFollowClick = async () => {
+      await sendFollowCommand(button.dataset.username, button);
     };
     button.addEventListener("click", onFollowClick);
     container.append(indicator, button);
@@ -223,6 +286,12 @@
       if (presenterRequests.get(bubble) !== requestId || !bubble.isConnected) {
         return;
       }
+
+      const presenterInfo = response.presenter;
+      if (presenterInfo.isLive && previousPresenterLive !== true) {
+        showLiveBroadcastNotification(presenterInfo);
+      }
+      previousPresenterLive = presenterInfo.isLive === true;
 
       const avatar = bubble.querySelector(".tabblet-radio-avatar-image");
       if (!avatar) {
