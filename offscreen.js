@@ -1,72 +1,40 @@
-const audio = document.querySelector("#radio");
-
-function reportState(state, error) {
-  chrome.runtime.sendMessage({
-    target: "background",
-    type: "radio-state",
-    state,
-    error
-  });
+const audio = document.querySelector('#radio');
+let state = 'paused';
+let mediaError = '';
+function snapshot() { return { state, error: mediaError, src: audio.src, paused: audio.paused, volume: audio.volume }; }
+function report() { chrome.runtime.sendMessage({ target: 'background', type: 'radio-state', playback: snapshot() }).catch(() => {}); }
+for (const [event, next] of Object.entries({ playing: 'playing', pause: 'paused', waiting: 'buffering', ended: 'error', error: 'error' })) {
+  audio.addEventListener(event, () => { state = next; mediaError = next === 'error' ? 'A transmissão caiu. Tentaremos reconectar.' : ''; report(); });
 }
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.target !== "offscreen" || message.type !== "radio-command") {
-    return false;
-  }
-
-  if (message.action === "volume") {
-    audio.volume = Number(message.value);
-    sendResponse({ ok: true });
-    return false;
-  }
-
-  if (message.action === "mute") {
-    audio.muted = message.value === true;
-    sendResponse({ ok: true });
-    return false;
-  }
-
-  if (message.action === "pause") {
-    audio.pause();
-    sendResponse({ ok: true });
-    return false;
-  }
-
-  if (message.action === "play" || message.action === "restart") {
-    if (message.streamUrl !== "https://streaming.pluz.fm/listen/pluz_mix/radio.mp3"
-      && message.streamUrl !== "https://streaming.pluz.fm/listen/tabblet/stream.aac") {
-      sendResponse({ ok: false, error: "Endereço de transmissão inválido." });
-      return false;
-    }
-
-    if (message.action === "restart") {
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message?.target !== 'offscreen' || message.type !== 'radio-apply') return false;
+  (async () => {
+    if (!TabbletCore.safeStream(message.source)) throw new Error('Endereço de transmissão inválido.');
+    if (!Number.isFinite(message.volume) || message.volume < 0 || message.volume > 1) throw new Error('Volume inválido.');
+    audio.volume = message.volume;
+    audio.muted = message.muted === true;
+    if (message.paused) {
       audio.pause();
-      audio.removeAttribute("src");
-      audio.load();
-      audio.src = message.streamUrl;
-      audio.load();
-    } else if (audio.src !== message.streamUrl) {
-      audio.src = message.streamUrl;
+      state = 'paused';
+      return;
+    }
+    const changed = audio.src !== message.source || message.restart || state === 'error';
+    if (changed) {
+      audio.src = message.source;
       audio.load();
     }
-    audio.volume = Number(message.value);
-    audio.play()
-      .then(() => sendResponse({ ok: true }))
-      .catch((error) => {
-        reportState("error", error.message);
-        sendResponse({ ok: false, error: error.message });
-      });
-    return true;
-  }
-
-  sendResponse({ ok: false, error: `Comando de áudio inválido: ${message.action}` });
-  return false;
-});
-
-audio.addEventListener("playing", () => reportState("playing"));
-audio.addEventListener("pause", () => reportState("paused"));
-audio.addEventListener("error", () => {
-  const error = audio.error;
-  console.error("Rádio Tabblet: erro ao carregar o stream.", error);
-  reportState("error", error ? error.message || `MediaError ${error.code}` : "Erro desconhecido");
+    if (changed || audio.paused) {
+      state = 'buffering';
+      mediaError = '';
+      let timer;
+      try {
+        await Promise.race([audio.play(), new Promise((_, reject) => { timer = setTimeout(() => { audio.pause(); reject(new Error('A conexão de áudio demorou demais.')); }, 12_000); })]);
+        state = 'playing';
+      } finally { clearTimeout(timer); }
+    }
+  })().then(() => respond({ ok: true, playback: snapshot() })).catch(e => {
+    state = 'error'; mediaError = e.message;
+    respond({ ok: false, error: e.message }); report();
+  });
+  return true;
 });
