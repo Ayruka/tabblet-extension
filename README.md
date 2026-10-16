@@ -9,7 +9,7 @@ Player Manifest V3 para Chrome/Edge 120 ou posterior. Adiciona um player compact
 3. Selecione a pasta deste projeto e abra `https://www.habblet.city/hotel`.
 4. Após alterar o código, recarregue a extensão na tela de extensões e depois a página do hotel.
 
-Não há build nem dependências para executar a extensão. O cartão começa alinhado à coluna direita, abaixo da Rádio Habblet e com a mesma largura dos painéis. É possível arrastá-lo pela área do avatar/nome, e a posição escolhida é salva; o player fica sempre aberto, sem cabeçalho ou controle de recolher. O ícone de nota musical abre o formulário de pedido no site em uma nova aba; o globo abre a página inicial. O ícone da barra do navegador ainda não tem popup.
+Não há build nem dependências para executar a extensão. O cartão começa alinhado à coluna direita, abaixo da Rádio Habblet e com a mesma largura dos painéis. É possível arrastá-lo pela área do avatar/nome, e a posição escolhida é salva; o player fica sempre aberto, sem cabeçalho ou controle de recolher. O ícone de globo abre a página inicial da Tabblet em outra aba. O ícone da barra do navegador ainda não tem popup.
 
 ## Reprodução e preferências
 
@@ -34,7 +34,7 @@ A interface usa Shadow DOM para isolar o CSS do hotel. O layout escolhido é o c
 python3 preview/server.py
 ```
 
-Abra `http://localhost:4187/preview/`. A prévia usa o mesmo componente visual da extensão, com programação simulada e sem tocar áudio. A cabeça e o nome do locutor vêm da API pública real, por um proxy local de leitura; o botão de simulação alterna sua presença no player. As escolhas da prévia ficam no localStorage da prévia, separadas das preferências reais. O formulário de pedido na prévia é simulado e não envia mensagens; na extensão, o atalho abre o formulário real do site em outra aba.
+Abra `http://localhost:4187/preview/`. A prévia usa o mesmo componente visual da extensão, com programação simulada e sem tocar áudio. A cabeça e o nome do locutor vêm da API pública real, por um proxy local de leitura; o botão de simulação alterna sua presença no player. As escolhas da prévia ficam no localStorage da prévia, separadas das preferências reais.
 
 ## Estrutura
 
@@ -44,7 +44,6 @@ Abra `http://localhost:4187/preview/`. A prévia usa o mesmo componente visual d
 - `player-ui.js` / `player.css`: componente visual compartilhado com a prévia.
 - `content.js`: montagem do cartão, mensagens e integração com áudio/chat do hotel.
 - `player-placement.js`: encaixe inicial na coluna nativa, arraste, posição salva e limites da janela.
-- `site-actions.js`: abre o formulário nativo de pedidos no site a partir do atalho da extensão.
 
 ## Validar
 

@@ -21,11 +21,6 @@ for (const variant of ['compact']) {
   let playback = { state: prefs.paused ? 'paused' : 'playing' };
   const widget = TabbletPlayer.create({
     styleUrl: '../player.css', floating: false,
-    onRequest: () => {
-      const dialog = document.querySelector('#music-request');
-      dialog.querySelector('output').textContent = '';
-      dialog.showModal();
-    },
     assetUrl: (theme, kind) => `../assets/themes/${theme}/${kind}.webp`,
     onCommand: async (action, value) => {
       if (action === 'volume') prefs.volume = value;
@@ -64,11 +59,3 @@ async function refreshPresenter() {
 }
 void refreshPresenter();
 setInterval(refreshPresenter, 60000);
-
-const requestDialog = document.querySelector('#music-request');
-requestDialog.querySelector('[data-close]').addEventListener('click', () => requestDialog.close());
-requestDialog.addEventListener('click', event => { if (event.target === requestDialog) requestDialog.close(); });
-requestDialog.querySelector('form').addEventListener('submit', event => {
- event.preventDefault();
- requestDialog.querySelector('output').textContent = 'Pedido simulado! Nenhuma mensagem foi enviada ao locutor.';
-});

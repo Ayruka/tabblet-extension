@@ -48,15 +48,6 @@
         "content.js"
       ],
       "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://tabblet.net/*"
-      ],
-      "js": [
-        "site-actions.js"
-      ],
-      "run_at": "document_idle"
     }
   ],
   "minimum_chrome_version": "120",

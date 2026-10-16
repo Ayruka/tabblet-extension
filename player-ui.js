@@ -4,12 +4,11 @@
     play: '<path d="m9 5 11 7-11 7z"/>', pause: '<path d="M8 5v14M16 5v14"/>',
     volume: '<path d="m11 4-6 5H2v6h3l6 5zM16 8a6 6 0 0 1 0 8M19 5a10 10 0 0 1 0 14"/>',
     reload: '<path d="M20 7v5h-5M20 12a8 8 0 1 0-2 6M20 7l-3-3"/>',
-    music: '<path d="M9 18V5l11-2v13M9 9l11-2"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
     site: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a18 18 0 0 1 0 18 18 18 0 0 1 0-18"/>',
     follow: '<path d="M14 3h7v7M21 3l-9 9M10 5H4v15h15v-6"/>'
   };
   const svg = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`;
-  function create({ assetUrl, styleUrl, onCommand, onFollow, onRequest, floating = true }) {
+  function create({ assetUrl, styleUrl, onCommand, onFollow, floating = true }) {
     const host = document.createElement('div');
     host.dataset.tabbletPlayer = '';
     host.className = 'tabblet-extension-host';
@@ -22,15 +21,11 @@
       <section class="player compact" aria-label="Rádio Tabblet">
         <div class="body">
           <div class="eyebrow"><span class="dot"></span><span class="mode">Conectando</span><span class="audience"></span></div><div class="now"><div class="avatar-wrap"><img class="avatar" alt="" width="52" height="52"></div><div class="now-copy"><div class="presenter-row"><h2 class="title" hidden></h2><button class="follow icon-button" type="button" hidden aria-label="Seguir locutor no hotel" title="Seguir locutor no hotel">${svg('follow')}</button></div><div class="channel-picker"><select id="channel" aria-label="Canal PluZ FM" disabled><option>Carregando…</option></select><svg class="channel-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></div><p class="subtitle">Carregando programação…</p></div></div>
-          <div class="transport"><button class="play" type="button" aria-label="Tocar rádio">${svg('play')}</button><div class="volume-group"><label class="volume-label"><span>${svg('volume')} Volume</span><output>50%</output></label><input class="volume" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="Volume"></div><div class="quick-actions"><button class="restart icon-button" type="button" aria-label="Reconectar transmissão" title="Reconectar transmissão">${svg('reload')}</button><a class="request icon-button" href="https://tabblet.net/#request-dialog" target="_blank" rel="noopener noreferrer" aria-label="Pedir música" title="Pedir música">${svg('music')}</a><a class="site icon-button" href="https://tabblet.net/" target="_blank" rel="noopener noreferrer" aria-label="Abrir site da Tabblet" title="Abrir site da Tabblet">${svg('site')}</a></div></div>
+          <div class="transport"><button class="play" type="button" aria-label="Tocar rádio">${svg('play')}</button><div class="volume-group"><label class="volume-label"><span>${svg('volume')} Volume</span><output>50%</output></label><input class="volume" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="Volume"></div><div class="quick-actions"><button class="restart icon-button" type="button" aria-label="Reconectar transmissão" title="Reconectar transmissão">${svg('reload')}</button><a class="site icon-button" href="https://tabblet.net/" target="_blank" rel="noopener noreferrer" aria-label="Abrir site da Tabblet" title="Abrir site da Tabblet">${svg('site')}</a></div></div>
           <p class="notice" role="status" hidden></p>
         </div>
       </section>`;
     const el = selector => root.querySelector(selector);
-    if (onRequest) el('.request').addEventListener('click', event => {
-      event.preventDefault();
-      onRequest();
-    });
     let current;
     let lastTheme;
     let lastAvatar = '';
@@ -62,6 +57,8 @@
       const value = Number(event.target.value);
       volumeDraft = value;
       el('output').textContent = `${Math.round(value * 100)}%`;
+      el('.volume').title = `Volume: ${Math.round(value * 100)}%`;
+      el('.volume').setAttribute('aria-valuetext', `${Math.round(value * 100)}%`);
       el('.volume').style.setProperty('--level', `${value * 100}%`);
       clearTimeout(volumeTimer);
       volumeTimer = setTimeout(async () => { await guarded('volume', value); if (volumeDraft === value) volumeDraft = null; }, 100);
@@ -92,6 +89,8 @@
       const volume = volumeDraft ?? prefs.volume;
       el('.volume').value = String(volume);
       el('output').textContent = `${Math.round(volume * 100)}%`;
+      el('.volume').title = `Volume: ${Math.round(volume * 100)}%`;
+      el('.volume').setAttribute('aria-valuetext', `${Math.round(volume * 100)}%`);
       el('.volume').style.setProperty('--level', `${volume * 100}%`);
       el('.play').disabled = pendingPlay;
       el('.play').innerHTML = svg(prefs.paused ? 'play' : 'pause');
