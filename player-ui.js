@@ -14,7 +14,7 @@
     host.dataset.tabbletPlayer = '';
     host.className = 'tabblet-extension-host';
     if (floating) {
-      host.style.cssText = 'all:initial;position:fixed;right:16px;bottom:76px;z-index:2147483000;display:block;width:min(320px,calc(100vw - 24px));max-height:calc(100dvh - 96px);';
+      host.style.cssText = 'all:initial;position:fixed;right:16px;bottom:76px;z-index:2147483000;display:block;width:min(200px,calc(100vw - 16px));max-height:calc(100dvh - 96px);';
     }
     const root = host.attachShadow({ mode: 'open' });
     root.innerHTML = `

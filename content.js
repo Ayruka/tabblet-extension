@@ -28,6 +28,7 @@
     }
   });
   document.body.append(widget.host);
+  const disposePlacement = TabbletPlacement.mount(widget);
   function muteHotelRadio() {
     if (!latest || latest.prefs.paused || latest.playback.state !== 'playing') return;
     for (const media of document.querySelectorAll('audio,video')) {
@@ -85,6 +86,7 @@
     document.removeEventListener('play', muteHotelRadio, true);
     document.removeEventListener('visibilitychange', onVisibility);
     for (const [media, muted] of originalMedia) media.muted = muted;
+    disposePlacement();
     widget.destroy();
   });
   void sync();

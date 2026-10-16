@@ -44,6 +44,7 @@
       "js": [
         "radio-core.js",
         "player-ui.js",
+        "player-placement.js",
         "content.js"
       ],
       "run_at": "document_idle"

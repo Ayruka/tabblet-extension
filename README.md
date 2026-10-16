@@ -9,7 +9,7 @@ Player Manifest V3 para Chrome/Edge 120 ou posterior. Adiciona um player compact
 3. Selecione a pasta deste projeto e abra `https://www.habblet.city/hotel`.
 4. Após alterar o código, recarregue a extensão na tela de extensões e depois a página do hotel.
 
-Não há build nem dependências para executar a extensão. O cartão fica no canto inferior direito, acima da barra do hotel; o player fica sempre aberto, sem cabeçalho ou controle de recolher. O ícone de nota musical abre o formulário de pedido no site em uma nova aba; o globo abre a página inicial. O ícone da barra do navegador ainda não tem popup.
+Não há build nem dependências para executar a extensão. O cartão começa alinhado à coluna direita, abaixo da Rádio Habblet e com a mesma largura dos painéis. É possível arrastá-lo pela área do avatar/nome, e a posição escolhida é salva; o player fica sempre aberto, sem cabeçalho ou controle de recolher. O ícone de nota musical abre o formulário de pedido no site em uma nova aba; o globo abre a página inicial. O ícone da barra do navegador ainda não tem popup.
 
 ## Reprodução e preferências
 
@@ -43,6 +43,7 @@ Abra `http://localhost:4187/preview/`. A prévia usa o mesmo componente visual d
 - `offscreen.html` / `offscreen.js`: um único HTMLAudioElement, com validação dos destinos de áudio.
 - `player-ui.js` / `player.css`: componente visual compartilhado com a prévia.
 - `content.js`: montagem do cartão, mensagens e integração com áudio/chat do hotel.
+- `player-placement.js`: encaixe inicial na coluna nativa, arraste, posição salva e limites da janela.
 - `site-actions.js`: abre o formulário nativo de pedidos no site a partir do atalho da extensão.
 
 ## Validar

@@ -17,7 +17,7 @@ function wave(seconds=40){
   context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.CHROME_PATH,args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`,'--autoplay-policy=no-user-gesture-required'],viewport:{width:1280,height:900}});
   const tone=wave();
   await context.route('https://audio.tabblet.net/**',route=>route.fulfill({status:200,contentType:'audio/wav',body:tone}));
-  await context.route('https://www.habblet.city/hotel',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><html><head><meta charset="utf-8"></head><body style="background:#243133"><div class="nitro-notification-bubble">Rádio Habblet<audio id="original"></audio></div><input class="chat-input" name="chat" maxlength="100"></body></html>'}));
+  await context.route('https://www.habblet.city/hotel',route=>route.fulfill({status:200,contentType:'text/html',body:fs.readFileSync(path.join(__dirname,'fixtures/hotel.html'),'utf8')}));
   const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
   await worker.evaluate(()=>{
    const native=fetch;
@@ -38,12 +38,34 @@ function wave(seconds=40){
   const widget=page.locator('[data-tabblet-player]');
   await widget.locator('.player[data-state=playing]').waitFor({timeout:20000});
   assert.equal(await page.locator('#original').evaluate(el=>el.muted),true,'native radio is muted without inspecting any SVG');
+  await page.waitForFunction(()=>{const host=document.querySelector('[data-tabblet-player]'),slot=document.querySelector('[data-tabblet-radio-slot]');return slot&&Math.abs(host.getBoundingClientRect().top-slot.getBoundingClientRect().top)<1;});
+  const docking=await page.evaluate(()=>{const h=document.querySelector('[data-tabblet-player]').getBoundingClientRect(),n=document.querySelector('.nitro-notification-bubble').getBoundingClientRect(),m=document.querySelector('.hotel-notice').getBoundingClientRect();return {width:h.width,nativeWidth:n.width,left:h.left,nativeLeft:n.left,top:h.top,nativeBottom:n.bottom,bottom:h.bottom,noticeTop:m.top};});
+  assert.equal(docking.width,docking.nativeWidth);
+  assert.equal(docking.left,docking.nativeLeft);
+  assert(docking.top>=docking.nativeBottom&&docking.bottom<=docking.noticeTop,'default position reserves space in the notification column');
+  assert.equal(await widget.locator('.player').evaluate(el=>el.scrollWidth<=el.clientWidth),true,'200 px layout must not overflow');
+  await page.screenshot({path:'docs/player-in-hotel-docked.png'});
+
   await widget.locator('#channel').selectOption('7');
   await widget.locator('.volume').fill('0.12');await page.waitForTimeout(200);
   await page.reload();
   await widget.locator('.player[data-state=playing]').waitFor();
   assert.equal(await widget.locator('#channel').inputValue(),'7');
   assert.equal(await widget.locator('.volume').inputValue(),'0.12');
+  const handle=await widget.locator('.avatar-wrap').boundingBox();
+  const beforeDrag=await widget.boundingBox();
+  await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);
+  await page.mouse.down();await page.mouse.move(500,350,{steps:8});await page.mouse.up();
+  const moved=await widget.boundingBox();
+  assert(Math.abs(moved.x-beforeDrag.x)>100,'player moves outside the default column');
+  assert.equal(await page.locator('[data-tabblet-radio-slot]').count(),0,'drag releases the reserved sidebar space');
+  await worker.evaluate(async()=>{if(!(await chrome.storage.local.get('radioPlayerPlacement')).radioPlayerPlacement)throw Error('position not saved');});
+  await page.reload();await widget.locator('.player[data-state=playing]').waitFor();
+  const restored=await widget.boundingBox();assert(Math.abs(restored.x-moved.x)<1&&Math.abs(restored.y-moved.y)<1,'dragged position survives F5');
+  await page.setViewportSize({width:640,height:400});
+  await page.waitForFunction(()=>{const r=document.querySelector('[data-tabblet-player]').getBoundingClientRect();return r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;});
+  await page.setViewportSize({width:1280,height:900});
+
   // Exercise the real worker, native storage, offscreen document and HTMLAudioElement.
   async function live(value){await worker.evaluate(async value=>{globalThis.__live=value;await serial(()=>synchronize(true));},value);}
   await live(true);await widget.locator('.title').filter({hasText:'Blacky..'}).waitFor();
@@ -83,6 +105,6 @@ function wave(seconds=40){
   await worker.evaluate(async()=>{await serial(cleanupTabs);});
   assert.equal(await worker.evaluate(async()=>(await chrome.runtime.getContexts({contextTypes:['OFFSCREEN_DOCUMENT']})).length),0);
   assert.deepEqual(errors,[]);
-  console.log('Native extension passed: real offscreen HTMLAudioElement (test WAV), persistent preferences/F5, live return, pause, two-tab sync, always-expanded UI, native-radio mute and last-tab cleanup.');
+  console.log('Native extension passed: real offscreen HTMLAudioElement (test WAV), persistent preferences/F5, live return, pause, two-tab sync, always-expanded UI, 200 px native docking, drag/F5 position, native-radio mute and last-tab cleanup.');
  }finally{if(context)await context.close();fs.rmSync(profile,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
