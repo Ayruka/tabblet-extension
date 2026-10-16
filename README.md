@@ -15,6 +15,7 @@ Não há build nem dependências para executar a extensão. O cartão começa al
 
 - Sem locutor, o usuário escolhe entre os canais retornados pela API pública da Tabblet, com uma lista local de reserva.
 - A entrada ao vivo assume a reprodução; o fim da live devolve o áudio ao canal escolhido. O seletor fica oculto durante a live e preserva o canal anterior.
+- O volume usa uma curva quadrática para permitir níveis baixos: 1% no controle aplica amplitude de 0,0001; 0% silencia e 100% mantém o nível máximo. A preferência salva continua sendo a porcentagem escolhida.
 - Volume, canal e pausa ficam em `chrome.storage.local`, na chave `radioPreferences`. F5 e uma segunda aba preservam as escolhas. Desinstalar a extensão remove as preferências.
 - Existe um único áudio compartilhado entre as abas. Comandos e preferências são sincronizados entre elas. Silenciar todas as abas do hotel silencia esse áudio; fechar a última aba encerra o documento de áudio.
 - Uma pausa manual continua valendo durante as transições. Reiniciar reconecta o stream, respeitando a pausa.
@@ -54,11 +55,11 @@ npm run check
 npm test
 ```
 
-Os testes de navegador usam Playwright e Chromium instalados no ambiente. Com o servidor da prévia em execução:
+Os testes de navegador usam Node.js 22 ou posterior, Playwright e Chromium instalados no ambiente. Com o servidor da prévia em execução:
 
 ```sh
 PLAYWRIGHT_MODULE=/caminho/para/playwright-core CHROME_PATH=/caminho/para/chrome node tests/preview-browser.cjs
 PLAYWRIGHT_MODULE=/caminho/para/playwright-core CHROME_PATH=/caminho/para/chrome node tests/extension-browser.cjs
 ```
 
-O segundo teste carrega a extensão real em um perfil temporário, usa armazenamento e documento offscreen nativos, e reproduz um WAV de teste. A API e o HTML do hotel são simulados para verificar as transições de forma determinística. A validação final na sessão autenticada real do Habblet continua necessária.
+O segundo teste carrega a extensão real em um perfil temporário, usa armazenamento e documento offscreen nativos, e reproduz um WAV de teste. A interceptação via CDP cobre o documento offscreen, para que o teste não dependa dos streams reais. Também verifica o ganho em 1%, silêncio em 0%, nível máximo e a persistência após F5. A API e o HTML do hotel são simulados para verificar as transições de forma determinística. A validação final na sessão autenticada real do Habblet continua necessária.

@@ -14,9 +14,10 @@ function wave(seconds=40){
  let context;
  try{
   const root=path.resolve(__dirname,'..');
-  context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.CHROME_PATH,args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`,'--autoplay-policy=no-user-gesture-required'],viewport:{width:1280,height:900}});
+  context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.CHROME_PATH,args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`,'--autoplay-policy=no-user-gesture-required','--remote-debugging-port=0'],viewport:{width:1280,height:900}});
   const tone=wave();
-  await context.route('https://audio.tabblet.net/**',route=>route.fulfill({status:200,contentType:'audio/wav',body:tone}));
+  const [port,endpoint] = fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').trim().split('\n');
+  const media = await require('./offscreen-media.cjs').installOffscreenMedia(`ws://127.0.0.1:${port}${endpoint}`,tone);
   await context.route('https://www.habblet.city/hotel',route=>route.fulfill({status:200,contentType:'text/html',body:fs.readFileSync(path.join(__dirname,'fixtures/hotel.html'),'utf8')}));
   const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
   await worker.evaluate(()=>{
@@ -37,6 +38,7 @@ function wave(seconds=40){
   await page.goto('https://www.habblet.city/hotel');
   const widget=page.locator('[data-tabblet-player]');
   await widget.locator('.player[data-state=playing]').waitFor({timeout:20000});
+  assert(media.requests>0,'offscreen audio must use the test media fixture');
   assert.equal(await page.locator('#original').evaluate(el=>el.muted),true,'native radio is muted without inspecting any SVG');
   await page.waitForFunction(()=>{const host=document.querySelector('[data-tabblet-player]'),slot=document.querySelector('[data-tabblet-radio-slot]');return slot&&Math.abs(host.getBoundingClientRect().top-slot.getBoundingClientRect().top)<1;});
   const docking=await page.evaluate(()=>{const h=document.querySelector('[data-tabblet-player]').getBoundingClientRect(),n=document.querySelector('.nitro-notification-bubble').getBoundingClientRect(),m=document.querySelector('.hotel-notice').getBoundingClientRect();return {width:h.width,nativeWidth:n.width,left:h.left,nativeLeft:n.left,top:h.top,nativeBottom:n.bottom,bottom:h.bottom,noticeTop:m.top};});
@@ -73,11 +75,21 @@ function wave(seconds=40){
   assert.equal(await widget.locator('.avatar').getAttribute('alt'),'Cabeça de Blacky..');
   assert.equal(await widget.locator('#channel').inputValue(),'7');
   assert.equal(await worker.evaluate(()=>playback.src),'https://audio.tabblet.net/listen/tabblet/stream.aac');
-  assert.equal(await worker.evaluate(()=>playback.volume),0.12);
+  assert(Math.abs(await worker.evaluate(()=>playback.volume)-0.0144)<1e-8,'12% preference applies the quieter audio curve');
   await live(false);await widget.locator('.player[data-live=false]').waitFor();
   assert.equal(await widget.locator('#channel').inputValue(),'7');
   assert.match(await widget.locator('.avatar').getAttribute('src'), /icon.webp$/);
   assert.match(await worker.evaluate(()=>playback.src),/canal_brasil_vibes/);
+  await widget.locator('.volume').fill('0.01');await page.waitForTimeout(200);
+  assert(Math.abs(await worker.evaluate(()=>playback.volume)-0.0001)<1e-8,'1% applies 0.0001 amplitude, not 0.01');
+  await page.reload();await widget.locator('.player[data-state=playing]').waitFor();
+  assert.equal(await widget.locator('.volume').inputValue(),'0.01');
+  assert(Math.abs(await worker.evaluate(()=>playback.volume)-0.0001)<1e-8,'quiet level persists after F5');
+  for (const [value, gain] of [['0',0], ['1',1], ['0.12',0.0144]]) {
+    await widget.locator('.volume').fill(value);await page.waitForTimeout(200);
+    assert(Math.abs(await worker.evaluate(()=>playback.volume)-gain)<1e-8,'silence, full volume and restored level remain correct');
+  }
+
   await widget.locator('.play').click();await widget.locator('.player[data-state=paused]').waitFor();
   await live(true);assert.equal(await worker.evaluate(()=>playback.paused),true);
   const page2=await context.newPage();await page2.goto('https://www.habblet.city/hotel');

@@ -11,7 +11,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   (async () => {
     if (!TabbletCore.safeStream(message.source)) throw new Error('Endereço de transmissão inválido.');
     if (!Number.isFinite(message.volume) || message.volume < 0 || message.volume > 1) throw new Error('Volume inválido.');
-    audio.volume = message.volume;
+    // The slider is a listening-level preference, not a linear amplitude control.
+    // A quadratic curve gives the low end enough attenuation (1% -> 0.0001).
+    audio.volume = message.volume ** 2;
     audio.muted = message.muted === true;
     if (message.paused) {
       audio.pause();
