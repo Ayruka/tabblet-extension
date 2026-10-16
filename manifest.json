@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Rádio Tabblet",
-  "version": "1.0.0",
-  "description": "Substitui o player da RádioHabblet pela Rádio Tabblet no Habblet.",
+  "version": "1.1.0",
+  "description": "Ouça a Rádio Tabblet e escolha canais PluZ no Habblet, com temas sazonais e preferências salvas.",
   "icons": {
     "16": "tabblet.png",
     "32": "tabblet.png",
@@ -18,18 +18,22 @@
     },
     "default_title": "Rádio Tabblet"
   },
-  "permissions": ["offscreen", "storage", "tabs"],
+  "permissions": [
+    "offscreen",
+    "storage",
+    "tabs",
+    "alarms"
+  ],
   "background": {
     "service_worker": "background.js"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; media-src https://streaming.pluz.fm;"
+    "extension_pages": "script-src 'self'; object-src 'self'; media-src https://audio.tabblet.net https://streaming.pluz.fm;"
   },
   "host_permissions": [
     "https://www.habblet.city/*",
     "https://habblet.city/*",
-    "https://tabblet.net/*",
-    "https://api.radiohabblet.com.br/*"
+    "https://tabblet.net/*"
   ],
   "content_scripts": [
     {
@@ -37,9 +41,26 @@
         "https://www.habblet.city/hotel*",
         "https://habblet.city/hotel*"
       ],
-      "js": ["content.js"],
-      "css": ["player.css"],
+      "js": [
+        "radio-core.js",
+        "player-ui.js",
+        "player-placement.js",
+        "content.js"
+      ],
       "run_at": "document_idle"
+    }
+  ],
+  "minimum_chrome_version": "120",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "player.css",
+        "assets/themes/*/*.webp"
+      ],
+      "matches": [
+        "https://www.habblet.city/*",
+        "https://habblet.city/*"
+      ]
     }
   ]
 }

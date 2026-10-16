@@ -1,303 +1,187 @@
-const OFFSCREEN_PATH = "offscreen.html";
-const STATUS_API_URL = "https://tabblet.net/api/public/status";
-const AVATAR_API_URL = "https://api.radiohabblet.com.br/imager";
-const MIX_STREAM_URL = "https://streaming.pluz.fm/listen/pluz_mix/radio.mp3";
-const LIVE_STREAM_URL = "https://streaming.pluz.fm/listen/tabblet/stream.aac";
-const MAX_AVATAR_BYTES = 1024 * 1024;
-const ACTIVE_TABS_KEY = "activeRadioTabs";
-let creatingOffscreenDocument;
-let activeTabsQueue = Promise.resolve();
-const contentTabIds = new Set();
-
-function isBroadcastLive(status) {
-  return status.streaming?.is_live === true;
-}
-
-function serializeActiveTabChange(change) {
-  const result = activeTabsQueue.then(change);
-  activeTabsQueue = result.catch(() => {});
+importScripts('radio-core.js');
+const Core = TabbletCore;
+const PREFS_KEY = 'radioPreferences';
+const TABS_KEY = 'activeRadioTabs';
+const STATUS_URL = 'https://tabblet.net/api/public/status';
+const THEME_URL = 'https://tabblet.net/api/public/theme';
+let queue = Promise.resolve();
+let creatingOffscreen;
+let statusFetchedAt = 0;
+let themeFetchedAt = 0;
+let status;
+let themeId = 'default';
+let prefs;
+let error = '';
+let playback = { state: 'paused', src: '', paused: true };
+const avatarCache = new Map();
+const ready = (async () => {
+  const [local, session] = await Promise.all([chrome.storage.local.get(PREFS_KEY), chrome.storage.session.get(['radioStatus', 'radioTheme'])]);
+  prefs = Core.preferences(local[PREFS_KEY]);
+  status = session.radioStatus;
+  themeId = Core.theme({ id: session.radioTheme });
+})();
+function serial(work) {
+  const result = queue.then(() => ready).then(work);
+  queue = result.catch(() => {});
   return result;
 }
-
-async function getActiveTabIds() {
-  const stored = await chrome.storage.session.get(ACTIVE_TABS_KEY);
-  return Array.isArray(stored[ACTIVE_TABS_KEY]) ? stored[ACTIVE_TABS_KEY] : [];
+async function tabIds() { return (await chrome.storage.session.get(TABS_KEY))[TABS_KEY] || []; }
+function hotelUrl(url) { return /^https:\/\/(www\.)?habblet\.city\/hotel(?:[/?#]|$)/i.test(url || ''); }
+async function register(tab) {
+  if (!tab || !hotelUrl(tab.url)) throw new Error('Abra o hotel para usar a rádio.');
+  const ids = await tabIds();
+  if (!ids.includes(tab.id)) await chrome.storage.session.set({ [TABS_KEY]: [...ids, tab.id] });
+  if (!(await chrome.alarms.get('radio-refresh'))) await chrome.alarms.create('radio-refresh', { periodInMinutes: 0.5 });
 }
-
-async function registerActiveTab(tabId) {
-  await serializeActiveTabChange(async () => {
-    const activeTabs = await getActiveTabIds();
-    if (!activeTabs.includes(tabId)) {
-      activeTabs.push(tabId);
-      await chrome.storage.session.set({ [ACTIVE_TABS_KEY]: activeTabs });
-    }
-  });
-  contentTabIds.add(tabId);
-  await syncPlayerMute();
+async function hasOffscreen() {
+  return (await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'], documentUrls: [chrome.runtime.getURL('offscreen.html')] })).length > 0;
 }
-
-async function syncPlayerMute() {
-  if (!(await hasOffscreenDocument())) {
+async function ensureOffscreen() {
+  if (await hasOffscreen()) return;
+  if (!creatingOffscreen) creatingOffscreen = chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'], justification: 'Reproduzir a Tabblet e os canais PluZ com um único player compartilhado entre abas.' });
+  try { await creatingOffscreen; } finally { creatingOffscreen = null; }
+}
+async function json(url) {
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+  if (!response.ok) throw new Error(`Serviço indisponível (HTTP ${response.status}).`);
+  return response.json();
+}
+async function refresh(force = false) {
+  const now = Date.now();
+  await Promise.all([
+    (async () => {
+      if (!force && now - statusFetchedAt < 12_000) return;
+      try {
+        status = Core.normalizeStatus(await json(STATUS_URL));
+        statusFetchedAt = now;
+        error = '';
+        await chrome.storage.session.set({ radioStatus: status });
+      } catch (e) {
+        error = 'Não foi possível atualizar a rádio. Tentaremos novamente.';
+        console.warn('Tabblet: status', e);
+        // A failed request must never be mistaken for the end of a live show.
+      }
+    })(),
+    (async () => {
+      if (!force && now - themeFetchedAt < 60_000) return;
+      try {
+        const next = await json(THEME_URL);
+        themeId = next.next_change_at && next.server_time >= next.next_change_at ? 'default' : Core.theme(next);
+        themeFetchedAt = now;
+        await chrome.storage.session.set({ radioTheme: themeId });
+      } catch (e) { console.warn('Tabblet: tema', e); }
+    })()
+  ]);
+}
+function snapshot() {
+  return { prefs, status, themeId, playback, error };
+}
+async function broadcast() {
+  const value = snapshot();
+  await Promise.all((await tabIds()).map(id => chrome.tabs.sendMessage(id, { target: 'content', type: 'radio-snapshot', value }).catch(() => {})));
+  return value;
+}
+async function reconcile(restart = false) {
+  if (!status) return;
+  const ids = await tabIds();
+  if (!ids.length) return;
+  if (prefs.paused && !(await hasOffscreen())) {
+    playback = { state: 'paused', paused: true, src: '', volume: prefs.volume };
     return;
   }
-
-  const tabIds = await getActiveTabIds();
-  const tabs = await Promise.all(tabIds.map(async (tabId) => {
-    try {
-      return await chrome.tabs.get(tabId);
-    } catch {
-      contentTabIds.delete(tabId);
-      return null;
-    }
-  }));
-  const validTabs = tabs.filter(Boolean);
-  const validIds = validTabs.map((tab) => tab.id);
-  await chrome.storage.session.set({ [ACTIVE_TABS_KEY]: validIds });
-  const muted = validTabs.length > 0 && validTabs.every((tab) => tab.mutedInfo?.muted === true);
-  await chrome.runtime.sendMessage({
-    target: "offscreen",
-    type: "radio-command",
-    action: "mute",
-    value: muted
-  });
+  await ensureOffscreen();
+  const tabs = (await Promise.all(ids.map(id => chrome.tabs.get(id).catch(() => null)))).filter(tab => tab && hotelUrl(tab.url));
+  if (!tabs.length) { await cleanupTabs(); return; }
+  const source = Core.source(status, prefs);
+  const response = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'radio-apply', source: source.url, paused: prefs.paused, volume: prefs.volume, muted: tabs.every(tab => tab.mutedInfo?.muted), restart });
+  if (!response?.ok) throw new Error(response?.error || 'O player não respondeu.');
+  playback = response.playback;
 }
-
-async function hasOffscreenDocument() {
-  const contexts = await chrome.runtime.getContexts({
-    contextTypes: ["OFFSCREEN_DOCUMENT"],
-    documentUrls: [chrome.runtime.getURL(OFFSCREEN_PATH)]
-  });
-  return contexts.length > 0;
+async function synchronize(force = false) {
+  await refresh(force);
+  try { await reconcile(); } catch (e) {
+    playback = { ...playback, state: 'error', error: e.message };
+    console.warn('Tabblet: reprodução', e);
+  }
+  return broadcast();
 }
-
-async function ensureOffscreenDocument() {
-  if (await hasOffscreenDocument()) {
-    return;
-  }
-
-  if (!creatingOffscreenDocument) {
-    creatingOffscreenDocument = chrome.offscreen.createDocument({
-      url: OFFSCREEN_PATH,
-      reasons: ["AUDIO_PLAYBACK"],
-      justification: "Reproduzir a rádio fora da CSP da página do Habblet."
-    });
-  }
-
+async function command(message, tab) {
+  await register(tab);
+  if (message.action === 'volume') {
+    if (typeof message.value !== 'number' || !Number.isFinite(message.value) || message.value < 0 || message.value > 1) throw new Error('Volume inválido.');
+    prefs.volume = message.value;
+  } else if (message.action === 'channel') {
+    if (!status?.channels.some(c => c.id === message.value)) throw new Error('Canal indisponível.');
+    prefs.channelId = message.value;
+  } else if (message.action === 'pause') prefs.paused = true;
+  else if (message.action === 'play') prefs.paused = false;
+  else if (message.action !== 'restart') throw new Error('Comando inválido.');
+  await chrome.storage.local.set({ [PREFS_KEY]: prefs });
+  if (message.action === 'play' || message.action === 'restart') await refresh();
+  try { await reconcile(message.action === 'restart'); }
+  catch (e) { playback = { ...playback, state: 'error', error: e.message }; }
+  return broadcast();
+}
+async function cleanupTabs() {
+  const ids = await tabIds();
+  const tabs = await Promise.all(ids.map(id => chrome.tabs.get(id).catch(() => null)));
+  const remaining = tabs.filter(tab => tab && hotelUrl(tab.url)).map(tab => tab.id);
+  await chrome.storage.session.set({ [TABS_KEY]: remaining });
+  if (!remaining.length) {
+    await chrome.alarms.clear('radio-refresh');
+    if (await hasOffscreen()) await chrome.offscreen.closeDocument();
+    playback = { state: 'paused', paused: true, src: '' };
+  } else await reconcile();
+}
+async function avatar(figure) {
+  if (typeof figure !== 'string' || !/^[a-z0-9.-]{1,600}$/i.test(figure)) return '';
+  if (avatarCache.has(figure)) return avatarCache.get(figure);
   try {
-    await creatingOffscreenDocument;
-  } finally {
-    creatingOffscreenDocument = undefined;
-  }
+    const url = new URL('https://tabblet.net/api/public/avatar-image');
+    url.search = new URLSearchParams({ figure, headonly: '1', direction: '2', head_direction: '2', size: 'b', gesture: 'sml' });
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const type = (response.headers.get('content-type') || '').split(';')[0];
+    if (!response.ok || !/^image\/(png|webp|gif|jpeg)$/.test(type)) return '';
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > 1024 * 1024) return '';
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    const result = `data:${type};base64,${btoa(binary)}`;
+    if (avatarCache.size >= 12) avatarCache.clear();
+    avatarCache.set(figure, result);
+    return result;
+  } catch { return ''; }
 }
-
-async function handleCommand(message, tabId) {
-  if (message.action !== "play" && message.action !== "pause"
-    && message.action !== "volume" && message.action !== "restart") {
-    throw new Error(`Comando de áudio inválido: ${message.action}`);
-  }
-
-  if (Number.isInteger(tabId)) {
-    await registerActiveTab(tabId);
-  }
-
-  if (message.action !== "play" && message.action !== "restart"
-    && !(await hasOffscreenDocument())) {
-    return;
-  }
-
-  const streamUrl = message.action === "play" || message.action === "restart"
-    ? await getCurrentStreamUrl()
-    : undefined;
-  if (Number.isInteger(tabId) && !contentTabIds.has(tabId)) {
-    return;
-  }
-
-  await ensureOffscreenDocument();
-  await syncPlayerMute();
-  const response = await chrome.runtime.sendMessage({
-    target: "offscreen",
-    type: "radio-command",
-    action: message.action,
-    streamUrl,
-    value: message.value
-  });
-  if (response && response.ok === false) {
-    throw new Error(response.error || "O player não conseguiu executar o comando.");
-  }
-}
-
-async function getCurrentStreamUrl() {
-  const response = await fetch(STATUS_API_URL, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`A API de status respondeu HTTP ${response.status}.`);
-  }
-
-  const status = await response.json();
-  return isBroadcastLive(status)
-    ? LIVE_STREAM_URL
-    : MIX_STREAM_URL;
-}
-
-async function fetchPresenterInfo() {
-  const statusResponse = await fetch(STATUS_API_URL, { cache: "no-store" });
-  if (!statusResponse.ok) {
-    throw new Error(`A API de status respondeu HTTP ${statusResponse.status}.`);
-  }
-
-  const status = await statusResponse.json();
-  const isLive = isBroadcastLive(status);
-  const broadcast = status.broadcast && typeof status.broadcast === "object"
-    ? status.broadcast
-    : null;
-  const livePresenter = isLive && broadcast
-    ? broadcast
-    : null;
-  const username = livePresenter
-    ? livePresenter?.username
-      || livePresenter?.streamer_name
-      || "Tabblet DJ"
-    : "Tabblet DJ";
-  const avatarUsername = livePresenter
-    ? livePresenter.username || livePresenter.streamer_name || status.default_presenter?.username || "RadioTabblet"
-    : status.default_presenter?.username || "RadioTabblet";
-  const programTitle = livePresenter
-    ? livePresenter.title || status.slot?.title || "As melhores da Tabblet"
-    : "As melhores da Tabblet";
-  const listeners = Number(status.streaming?.listeners);
-
-  if (typeof username !== "string" || !username.trim()) {
-    throw new Error("A API de status não informou o usuário do locutor.");
-  }
-
-  let avatarDataUrl = "";
-  try {
-    const avatarUrl = new URL(AVATAR_API_URL);
-    avatarUrl.search = new URLSearchParams({
-      user: avatarUsername.trim(),
-      action: "std,crr=",
-      gesture: "sml",
-      direction: "4",
-      head_direction: "4",
-      headonly: "true",
-      size: "b",
-      img_format: "",
-      dance: "",
-      effect: "",
-      frame_num: "30"
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message?.target !== 'background') return false;
+  if (message.type === 'radio-state') {
+    if (sender.url !== chrome.runtime.getURL('offscreen.html')) return false;
+    void serial(async () => {
+      if (!status || message.playback?.src !== Core.source(status, prefs).url || message.playback.paused !== prefs.paused) return;
+      playback = message.playback;
+      await broadcast();
     });
-
-    const avatarResponse = await fetch(avatarUrl, {
-      cache: "force-cache",
-      signal: AbortSignal.timeout(8000)
-    });
-    if (!avatarResponse.ok) {
-      throw new Error(`A API de imagem respondeu HTTP ${avatarResponse.status} para ${avatarUsername}.`);
-    }
-
-    const contentType = avatarResponse.headers.get("content-type") || "";
-    if (!/^image\/(?:png|jpeg|gif|webp)$/i.test(contentType)) {
-      throw new Error(`A API de imagem retornou um tipo inesperado: ${contentType || "desconhecido"}.`);
-    }
-
-    const avatarBlob = await avatarResponse.blob();
-    if (avatarBlob.size === 0 || avatarBlob.size > MAX_AVATAR_BYTES) {
-      throw new Error(`A imagem de ${avatarUsername} está vazia ou excede o limite permitido.`);
-    }
-
-    const bytes = new Uint8Array(await avatarBlob.arrayBuffer());
-    let binary = "";
-    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-    }
-    avatarDataUrl = `data:${contentType};base64,${btoa(binary)}`;
-  } catch (error) {
-    console.warn("Rádio Tabblet: não foi possível carregar a imagem do locutor.", error);
-  }
-
-  return {
-    username: username.trim(),
-    avatarUsername: avatarUsername.trim(),
-    isLive,
-    programTitle,
-    listeners: Number.isFinite(listeners) && listeners >= 0 ? listeners : 0,
-    avatarDataUrl
-  };
-}
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.target === "background" && message.type === "radio-state") {
-    getActiveTabIds().then((tabIds) => tabIds.forEach((tabId) => {
-      chrome.tabs.sendMessage(tabId, {
-        target: "content",
-        type: "radio-state",
-        state: message.state,
-        error: message.error
-      }).catch(() => contentTabIds.delete(tabId));
-    })).catch((error) => console.error("Rádio Tabblet: falha ao encaminhar estado do áudio.", error));
     return false;
   }
-
-  if (message?.target === "background" && message.type === "presenter-info") {
-    fetchPresenterInfo()
-      .then((presenter) => sendResponse({ ok: true, presenter }))
-      .catch((error) => {
-        console.error("Rádio Tabblet: falha ao carregar os dados do locutor.", error);
-        sendResponse({ ok: false, error: error.message });
-      });
+  if (!sender.tab || !hotelUrl(sender.tab.url)) return false;
+  if (message.type === 'radio-avatar') {
+    avatar(message.figure).then(value => respond({ ok: true, value }));
     return true;
   }
-
-  if (!message || message.target !== "background" || message.type !== "radio-command") {
-    return false;
-  }
-
-  handleCommand(message, sender.tab && sender.tab.id)
-    .then(() => sendResponse({ ok: true }))
-    .catch((error) => {
-      console.error("Rádio Tabblet: falha ao controlar o player.", error);
-      sendResponse({ ok: false, error: error.message });
-    });
+  serial(async () => {
+    if (message.type === 'radio-command') return command(message, sender.tab);
+    if (message.type === 'radio-sync') {
+      await register(sender.tab);
+      return synchronize(message.force === true);
+    }
+    throw new Error('Mensagem inválida.');
+  }).then(value => respond({ ok: true, value })).catch(e => respond({ ok: false, error: e.message }));
   return true;
 });
-
-async function unregisterActiveTab(tabId) {
-  contentTabIds.delete(tabId);
-  await serializeActiveTabChange(async () => {
-    const activeTabs = await getActiveTabIds();
-    if (!activeTabs.includes(tabId)) {
-      return;
-    }
-    const remainingTabs = activeTabs.filter((activeTabId) => activeTabId !== tabId);
-    await chrome.storage.session.set({ [ACTIVE_TABS_KEY]: remainingTabs });
-    if (remainingTabs.length > 0 || !(await hasOffscreenDocument())) {
-      await syncPlayerMute();
-      return;
-    }
-
-    await chrome.runtime.sendMessage({
-      target: "offscreen",
-      type: "radio-command",
-      action: "pause"
-    });
-    await chrome.offscreen.closeDocument();
-  });
-}
-
-chrome.tabs.onRemoved.addListener((tabId) => {
-  unregisterActiveTab(tabId).catch((error) => {
-    console.error("Rádio Tabblet: falha ao parar o áudio após fechar a aba.", error);
-  });
+chrome.alarms.onAlarm.addListener(alarm => {
+  if (alarm.name === 'radio-refresh') void serial(async () => { await cleanupTabs(); if ((await tabIds()).length) await synchronize(); });
 });
-
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (changeInfo.mutedInfo) {
-    syncPlayerMute().catch((error) => {
-      console.error("Rádio Tabblet: falha ao sincronizar o áudio com o mudo da aba.", error);
-    });
-  }
-  if (changeInfo.url && !/^https:\/\/(?:www\.)?habblet\.city\/hotel(?:\/|$|\?|#)/i.test(changeInfo.url)) {
-    getActiveTabIds()
-      .then((tabIds) => tabIds.includes(tabId) ? unregisterActiveTab(tabId) : undefined)
-      .catch((error) => console.error("Rádio Tabblet: falha ao acompanhar a navegação da aba.", error));
-  }
+chrome.tabs.onRemoved.addListener(() => { void serial(cleanupTabs); });
+chrome.tabs.onUpdated.addListener((id, changes) => {
+  if (changes.url || changes.mutedInfo) void serial(cleanupTabs);
 });
